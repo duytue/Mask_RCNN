@@ -166,6 +166,48 @@ def display_instances(image, boxes, masks, class_ids, class_names,
     if auto_show:
         plt.show()
 
+def class2color(tag):
+    '''
+    :param tag: the class of the vehicle
+    :return: the color for visualization
+    '''
+    if tag == 'person':
+        return 0.8, 0, 0.2
+    elif tag == 'rider':
+        return 0.2, 0, 0.8
+
+def draw_instances(image, boxes, masks, class_ids, class_names, draw_box=True, draw_mask=True):
+    # Number of instances
+    N = boxes.shape[0]
+    if not N:
+        print("\n*** No instances to draw *** \n")
+    else:
+        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+
+    # Show area outside image boundaries.
+    # height, width = image.shape[:2]
+
+    drawn_image = image.copy().astype(np.uint8)
+    for i in range(N):
+        color = class2color(class_names[class_ids[i]])
+
+        # Mask
+        if draw_mask:
+            mask = masks[:, :, i]
+            drawn_image = apply_mask(drawn_image, mask, color)
+
+        # Bounding box
+        if not np.any(boxes[i]) or not draw_box:
+            # Skip this instance. Has no bbox. Likely lost in image cropping.
+            continue
+        y1, x1, y2, x2 = boxes[i]
+        cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (0, 255,0), thickness=1)
+
+	# Put class_name on top of bbox
+        cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
+
+    return drawn_image
+
 
 def display_differences(image,
                         gt_box, gt_class_id, gt_mask,
