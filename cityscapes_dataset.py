@@ -3,6 +3,8 @@ import sys
 import time
 import numpy as np
 
+from tqdm import tqdm
+
 from pycocotools.coco import COCO
 from pycocotools.cocoeval import COCOeval
 from pycocotools import mask as maskUtils
@@ -197,11 +199,20 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
     # Get corresponding COCO image IDs.
     coco_image_ids = [dataset.image_info[id]["id"] for id in image_ids]
 
+    if limit != 0:
+        limit = len(image_ids)
+    else:
+        limit = len(image_ids)
+    print("Evaluating on %d images" % limit)
+        
+
     t_prediction = 0
     t_start = time.time()
 
     results = []
-    for i, image_id in enumerate(image_ids):
+    for i, image_id in tqdm(enumerate(image_ids)):
+        if i == limit:
+            break
         # Load image
         image = dataset.load_image(image_id)
 
