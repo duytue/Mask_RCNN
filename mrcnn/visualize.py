@@ -13,6 +13,7 @@ import random
 import itertools
 import colorsys
 
+import cv2
 import numpy as np
 from skimage.measure import find_contours
 import matplotlib.pyplot as plt
@@ -176,7 +177,7 @@ def class2color(tag):
     elif tag == 'rider':
         return 0.2, 0, 0.8
 
-def draw_instances(image, boxes, masks, class_ids, class_names, draw_box=True, draw_mask=True):
+def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, draw_box=True, draw_mask=True):
     # Number of instances
     N = boxes.shape[0]
     if not N:
@@ -189,6 +190,9 @@ def draw_instances(image, boxes, masks, class_ids, class_names, draw_box=True, d
 
     drawn_image = image.copy().astype(np.uint8)
     for i in range(N):
+        # Draw person only
+        if class_ids[i] != 1:
+            continue
         color = class2color(class_names[class_ids[i]])
 
         # Mask
@@ -203,8 +207,11 @@ def draw_instances(image, boxes, masks, class_ids, class_names, draw_box=True, d
         y1, x1, y2, x2 = boxes[i]
         cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (0, 255,0), thickness=1)
 
-	# Put class_name on top of bbox
-        cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
+	    # Put class_name on top of bbox
+        # cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
+        # Put score only on top of box
+        score = "%.2f" % pred_scores[i]
+        cv2.putText(drawn_image, score, (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
 
     return drawn_image
 
