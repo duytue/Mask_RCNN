@@ -232,26 +232,54 @@ def inference(model, config, image_dir, output_dir):
     print("Inference on %d images took %.1fs" % (len(file_list), time.time() - total_time))
 
 
+def getConfigVersion(args):
+    version = args.version
 
+    if version == "coco":
+        return CocoConfig()
+    elif version == "0":
+        return CityPersonConfig()
+    elif version == "1":
+        return CityPersonConfig1()
+    elif version == "2":
+        return CityPersonConfig2()
+    elif version == "3":
+        return CityPersonConfig3()
 
 
 def main():
     args = parse_arguments()
 
-    if args.mode == "train":
-        config = CityPersonConfig()
-    else:
-        config = InferenceConfig()
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
 
-    config.display()
+    # if args.mode == "train":
+    #     config = CityPersonConfig2()
+    # else:
+    #     if args.model == "coco":
+    #         config = CocoInferenceConfig()
+    #     else:
+    #         config = InferenceConfig()
+
+    config = getConfigVersion(args)
+
 
     # Create model
     if args.mode == "train":
         model = modellib.MaskRCNN(mode="training", config=config,
                                 model_dir=args.logs)
     else:
+        class InferenceConfig(config.__class__):
+            GPU_COUNT = 1
+            IMAGES_PER_GPU = 1
+            DETECTION_MIN_CONFIDENCE = 0.7
+            DETECTION_MAX_INSTANCES = 200
+        
+        config = InferenceConfig()
         model = modellib.MaskRCNN(mode="inference", config=config,
                                 model_dir=args.logs)
+    
+    config.display()
+
 
     # Load weights
     if args.model.lower() == "coco":
