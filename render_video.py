@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument('-i', dest='img_dir', required=True,
                     help="Path to directory that contains images for rendering")
 parser.add_argument('-o', dest='out_dir', default='results/output.avi',
-                    help="File path to save output video")
+                    help="File path to save output video ('results/output.avi').")
 
 args = parser.parse_args()
 
