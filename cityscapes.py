@@ -200,41 +200,97 @@ def parse_arguments():
                         help="GPU ID to train model.")
     parser.add_argument('--version', required=True, type=str,
                         help="Select config version to run.")
+    parser.add_argument('--output_type', default=None,
+                        help="Whether to output images or not. 'media' for image output.")
 
     return parser.parse_args()
 
-def inference(model, config, image_dir, output_dir):
+def inference(model, config, image_dir, output_dir, output_type=None):
+    def set_up_vcap(video_path, result_path):
+        vcapture = cv2.VideoCapture(video_path)
+        width = int(vcapture.get(cv2.CAP_PROP_FRAME_WIDTH))
+        height = int(vcapture.get(cv2.CAP_PROP_FRAME_HEIGHT))
+        fps = vcapture.get(cv2.CAP_PROP_FPS)
+        length = int(vcapture.get(cv2.CAP_PROP_FRAME_COUNT))
+        filename = os.path.join(result_path, 'video_{:%Y%m%dT%H%M%S}.avi'.format(datetime.datetime.now()))
+        vwriter = cv2.VideoWriter(filename, cv2.VideoWriter_fourcc(*'XVID'),
+                                fps, (width, height))
+        return vcapture, vwriter, filename, length
 
-    if not os.path.isdir(image_dir):
-        print("Invalid input directory!")
-
-    output_dir = os.path.join(output_dir, config.name)
+    output_dir = os.path.join(output_dir, config.NAME)
     if not os.path.isdir(output_dir):
         os.makedirs(output_dir)
-    
-    file_list = os.listdir(image_dir)
 
-    total_time = time.time()
-    for item in tqdm(sorted(file_list)):
-        if not os.path.splitext(item)[:-1] in ['.jpg', '.png']:
-            continue
-        
-        filepath = os.path.join(image_dir, item)
-        img = cv2.imread(filepath)
-        img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    # Input is video
+    if image_dir.split('.')[-1] in ['mp4', 'mov', 'MOV', 'MP4', 'avi']:
+        vcapture, vwriter, filename, cap_frames = set_up_vcap(image_dir, output_dir)
+        start = 0
+        end = cap_frames
+        count = 0
+        success = True
+        prev_r = None
 
         start_time = time.time()
-        r = model.detect([img])
+        while success:
+            print('frame: ', count, end='\r')
+            success, image = vcapture.read()
+            if success and start <= count < end:
+                image_yuv = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+                r = model.detect([image_yuv], verbose=0)[0]
+
+                detection = visualize.draw_instances(image_yuv, r['rois'], r['masks'], 
+                                                    r['class_ids'], r['scores'], class_names,
+                                                    draw_box=True, draw_mask=False)
+                detection = detection[..., ::-1]
+
+                vis = cv2.resize(detection, None, fx=0.5, fy=0.5)
+                cv2.imshow('detection', vis)
+                vwriter.write(detection)
+
+                # Press ESC on keyboard to  exit
+                if cv2.waitKey(27) == ord('q'):
+                    break
+            elif count >= end:
+                success = False
+            count += 1
+
+        vwriter.release()
         end_time = time.time()
+        print('Saved to %s. Total time: %.2f' % (filename, end_time - start_time))
 
-        result = visualize.draw_instances(img, r['rois'], r['masks'], 
-                                                r['class_ids'], class_names,
-                                                draw_box=True, draw_mask=False)
+    # Input is directory of images
+    else:
+        if not os.path.isdir(image_dir):
+            print("Invalid input directory!")
+        
+        file_list = os.listdir(image_dir)
 
-        result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
-        cv2.imwrite(os.path.join(output_dir, item), result)
+        pure_dectetion_times = []
 
-    print("Inference on %d images took %.1fs" % (len(file_list), time.time() - total_time))
+        total_time = time.time()
+        for item in tqdm(sorted(file_list)):
+            if not os.path.splitext(item)[-1] in ['.jpg', '.png']:
+                continue
+            
+            filepath = os.path.join(image_dir, item)
+            img = cv2.imread(filepath)
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+            start_time = time.time()
+            r = model.detect([img])[0]
+            end_time = time.time()
+            pure_dectetion_times.append(end_time - start_time)
+
+            if output_type == "media":
+                result = visualize.draw_instances(img, r['rois'], r['masks'], 
+                                                        r['class_ids'], r['scores'], class_names,
+                                                        draw_box=True, draw_mask=False)
+
+                result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+                cv2.imwrite(os.path.join(output_dir, item), result)
+
+        avg_pure = sum(pure_dectetion_times) / len(pure_dectetion_times)
+        print("Inference on %d images took %.1fs (avg pure detection time: %.3fs)" % (len(file_list), time.time() - total_time, avg_pure))
 
 
 def getConfigVersion(args):
