@@ -168,6 +168,11 @@ def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
         # Loop through detections
         for i in range(rois.shape[0]):
             class_id = class_ids[i]
+
+            # Skip all class but person
+            if class_id != 1:
+                continue
+                
             score = scores[i]
             bbox = np.around(rois[i], 1)
             mask = masks[:, :, i]
