@@ -1,3 +1,5 @@
 python3 cityscapes.py --mode evaluate \
                         --dataset data/cityscapes \
-                        --model last
+                        --gpu_id 1 \
+                        --model last \
+                        --version 1

@@ -1,4 +1,7 @@
 python3 cityscapes.py --mode train \
                         --dataset data/cityscapes \
-                        --model coco \
-                        --epochs 40
+                        --resume \
+                        --gpu_id 0 \
+                        --model last \
+                        --version 1 \
+                        --epochs 60
