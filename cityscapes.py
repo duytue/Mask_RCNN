@@ -80,8 +80,8 @@ class CityPersonConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 1 # Person
 
-    STEPS_PER_EPOCH = 1000
-    VALIDATION_STEPS = 100
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
 
     IMAGE_MIN_DIM = 1024
     IMAGE_MAX_DIM = 1024
@@ -90,11 +90,83 @@ class CityPersonConfig(Config):
 
     RPN_ANCHOR_SCALES = (32, 64, 128, 256)
 
-class InferenceConfig(CityPersonConfig):
-    GPU_COUNT = 1
-    IMAGES_PER_GPU = 1
-    DETECTION_MIN_CONFIDENCE = 0
+class CityPersonConfig1(Config):
+    NAME = "city_person_res50"
+    BACKBONE = "resnet50"
 
+    IMAGES_PER_GPU = 1
+
+    NUM_CLASSES = 1 + 1 # Person
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    IMAGE_MIN_DIM = 1024
+    IMAGE_MAX_DIM = 1024
+
+    MAX_GT_INSTANCES = 50
+
+    RPN_ANCHOR_SCALES = (32, 64, 128, 256)
+
+class CityPersonConfig2(Config):
+    NAME = "city_person2"
+    BACKBONE = "resnet50"
+
+    IMAGES_PER_GPU = 1
+
+    NUM_CLASSES = 1 + 1 # Person
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    IMAGE_MIN_DIM = 1024
+    IMAGE_MAX_DIM = 1024
+
+    MAX_GT_INSTANCES = 50
+
+    RPN_ANCHOR_SCALES = (32, 64, 128, 256)
+
+    TRAIN_ROIS_PER_IMAGE = 256
+    ROI_POSITIVE_RATIO = 0.33
+
+    LOSS_WEIGHTS = {
+        "rpn_class_loss": 1.,
+        "rpn_bbox_loss": 1.2,
+        "mrcnn_class_loss": 1.,
+        "mrcnn_bbox_loss": 1.2,
+        "mrcnn_mask_loss": 0.8
+    }
+
+class CityPersonConfig3(Config):
+    NAME = "city_person3"
+    BACKBONE = "resnet50"
+
+    IMAGES_PER_GPU = 1
+
+    NUM_CLASSES = 1 + 1 # Person
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    IMAGE_MIN_DIM = 1024
+    IMAGE_MAX_DIM = 1024
+
+    MAX_GT_INSTANCES = 50
+
+    RPN_ANCHOR_SCALES = (32, 64, 128, 256)
+
+    TRAIN_ROIS_PER_IMAGE = 256
+    ROI_POSITIVE_RATIO = 0.33
+
+    # LOSS_WEIGHTS = {
+    #     "rpn_class_loss": 1.,
+    #     "rpn_bbox_loss": 1.2,
+    #     "mrcnn_class_loss": 1.,
+    #     "mrcnn_bbox_loss": 1.2,
+    #     "mrcnn_mask_loss": 0.8
+    # }
+
+    IMAGE_RESIZE_MODE = "none"
 
 
 def parse_arguments():
