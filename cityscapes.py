@@ -2,6 +2,7 @@ import os
 import cv2
 import sys
 import time
+import datetime
 import argparse
 import numpy as np
 import imgaug
@@ -181,6 +182,8 @@ def parse_arguments():
     parser.add_argument("--model", required=True,
                         default="mask_rcnn_coco.h5",
                         help="Path to weights .h5 file or 'coco'")
+    parser.add_argument("--resume", action='store_true',
+                        help="Resume or training from scratch")
     parser.add_argument('--logs', required=False,
                         default=DEFAULT_LOGS_DIR,
                         metavar="/path/to/logs/",
@@ -258,11 +261,15 @@ def main():
     else:
         model_path = args.model
 
-    model.load_weights(model_path, by_name=True, exclude=[
-            'mrcnn_class_logits', 'mrcnn_bbox_fc',
-            'mrcnn_bbox', 'mrcnn_mask'
-        ])
-    print("Loaded weights from ", model_path)
+    if args.mode in ["evaluate", "inference"] or args.resume:
+        model.load_weights(model_path, by_name=True)
+        print("Loaded weights from ", model_path)
+    else:
+        model.load_weights(model_path, by_name=True, exclude=[
+                'mrcnn_class_logits', 'mrcnn_bbox_fc',
+                'mrcnn_bbox', 'mrcnn_mask'
+            ])
+        print("Loaded weights without heads from ", model_path)
 
     if args.mode == "train":
         # Training set
@@ -286,7 +293,7 @@ def main():
                         )])
 
         # Training - Stage 1
-        print("Training network heads")
+        print("Training network heads using Config %s" % config.NAME)
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
                     epochs=args.epochs,
@@ -311,19 +318,19 @@ def main():
         #             layers='all',
         #             augmentation=augmentation)
 
-    elif args.command == "evaluate":
+    elif args.mode == "evaluate":
         # Validation dataset
         dataset_val = CityPersonDataset()
         coco = dataset_val.load_coco(args.dataset, "val", return_coco=True)
         dataset_val.prepare()
         # print("Running COCO evaluation on {} images.".format(args.limit))
-        evaluate_coco(model, dataset_val, coco, "bbox")
-    elif args.command == "inference":
+        evaluate_coco(model, dataset_val, coco, "bbox", limit=0)
+    elif args.mode == "inference":
         assert args.image_dir != None
-        inference(model, config, args.image_dir, args.result_dir)
+        inference(model, config, args.image_dir, args.result_dir, args.output_type)
     else:
         print("'{}' is not recognized. "
-              "Use 'train' or 'evaluate' or 'inference'".format(args.command))
+              "Use 'train' or 'evaluate' or 'inference'".format(args.mode))
 
 
 if __name__ == "__main__":
