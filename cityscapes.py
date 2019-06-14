@@ -195,6 +195,11 @@ def parse_arguments():
     parser.add_argument('--epochs', type=int,
                         default=40,
                         help='Number of epochs to train')
+    parser.add_argument('--gpu_id', type=str,
+                        default="0",
+                        help="GPU ID to train model.")
+    parser.add_argument('--version', required=True, type=str,
+                        help="Select config version to run.")
 
     return parser.parse_args()
 
