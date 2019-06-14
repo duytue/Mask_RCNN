@@ -63,11 +63,6 @@ class CocoConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 80  # COCO has 80 classes
 
-class CocoInferenceConfig(CocoConfig):
-    GPU_COUNT = 1
-    IMAGES_PER_GPU = 1
-    DETECTION_MIN_CONFIDENCE = 0.7
-
 class CityPersonConfig(Config):
     """Configuration for training on CityPerson sub-dataset of Cityscapes.
     """
