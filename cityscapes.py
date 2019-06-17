@@ -190,6 +190,8 @@ def parse_arguments():
     parser.add_argument('--epochs', type=int,
                         default=40,
                         help='Number of epochs to train')
+    parser.add_argument('--lr', default=0.001, type=float,
+                        help='Learning rate')
     parser.add_argument('--gpu_id', type=str,
                         default="0",
                         help="GPU ID to train model.")
@@ -297,6 +299,8 @@ def getConfigVersion(args):
         return CityPersonConfig()
     elif version == "1":
         return CityPersonConfig1()
+    elif version == "1.1":
+        return CityPersonConfig1_1()
     elif version == "2":
         return CityPersonConfig2()
     elif version == "3":
@@ -317,6 +321,8 @@ def main():
     #         config = InferenceConfig()
 
     config = getConfigVersion(args)
+
+    config.LEARNING_RATE = args.lr
 
 
     # Create model
