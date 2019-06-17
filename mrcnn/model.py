@@ -2536,6 +2536,15 @@ class MaskRCNN():
         if not os.path.exists(self.log_dir):
             os.makedirs(self.log_dir)
 
+        def step_decay(epoch):
+            # reduce learning rate lr by 5 after every epochs_drop epochs
+            initial_lrate = self.config.LEARNING_RATE
+            drop = 0.2
+            epochs_drop = 20.0
+            lrate = initial_lrate * math.pow(drop,
+                                             math.floor((1 + epoch) / epochs_drop))
+            return lrate
+
         # Callbacks
         callbacks = [
             keras.callbacks.TensorBoard(log_dir=self.log_dir,
@@ -2543,6 +2552,7 @@ class MaskRCNN():
             keras.callbacks.ModelCheckpoint(self.checkpoint_path,
                                             verbose=0, save_weights_only=True,
                                             save_best_only=True),
+            keras.callbacks.LearningRateScheduler(step_decay, verbose=1),
         ]
 
         # Add custom callbacks to the list
