@@ -175,15 +175,23 @@ def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
                 
             score = scores[i]
             bbox = np.around(rois[i], 1)
-            mask = masks[:, :, i]
+            if masks is not None:
+                mask = masks[:, :, i]
 
-            result = {
-                "image_id": image_id,
-                "category_id": dataset.get_source_class_id(class_id, "coco"),
-                "bbox": [bbox[1], bbox[0], bbox[3] - bbox[1], bbox[2] - bbox[0]],
-                "score": score,
-                "segmentation": maskUtils.encode(np.asfortranarray(mask))
-            }
+                result = {
+                    "image_id": image_id,
+                    "category_id": dataset.get_source_class_id(class_id, "coco"),
+                    "bbox": [bbox[1], bbox[0], bbox[3] - bbox[1], bbox[2] - bbox[0]],
+                    "score": score,
+                    "segmentation": maskUtils.encode(np.asfortranarray(mask))
+                }
+            else:
+                result = {
+                    "image_id": image_id,
+                    "category_id": dataset.get_source_class_id(class_id, "coco"),
+                    "bbox": [bbox[1], bbox[0], bbox[3] - bbox[1], bbox[2] - bbox[0]],
+                    "score": score
+                }
             results.append(result)
     return results
 

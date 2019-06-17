@@ -335,6 +335,8 @@ def main():
             IMAGES_PER_GPU = 1
             DETECTION_MIN_CONFIDENCE = 0.7
             DETECTION_MAX_INSTANCES = 200
+
+            NO_MASK = True
         
         config = InferenceConfig()
         model = modellib.MaskRCNN(mode="inference", config=config,

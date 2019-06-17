@@ -176,6 +176,8 @@ def class2color(tag):
         return 0.8, 0, 0.2
     elif tag == 'rider':
         return 0.2, 0, 0.8
+    else:
+        return 0.2, 0.8, 0.2
 
 def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, draw_box=True, draw_mask=True):
     # Number of instances
@@ -183,7 +185,10 @@ def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, dra
     if not N:
         print("\n*** No instances to draw *** \n")
     else:
-        assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+        if masks is not None:
+            assert boxes.shape[0] == masks.shape[-1] == class_ids.shape[0]
+        else:
+            assert boxes.shape[0] == class_ids.shape[0]
 
     # Show area outside image boundaries.
     # height, width = image.shape[:2]
