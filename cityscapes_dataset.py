@@ -176,6 +176,7 @@ def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
             score = scores[i]
             bbox = np.around(rois[i], 1)
             if masks is not None:
+                masks = masks.astype(np.uint8)
                 mask = masks[:, :, i]
 
                 result = {
@@ -239,7 +240,7 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         image_results = build_coco_results(dataset, coco_image_ids[i:i + 1],
                                            r["rois"], r["class_ids"],
                                            r["scores"],
-                                           r["masks"].astype(np.uint8))
+                                           r["masks"])
         results.extend(image_results)
 
     # Load results. This modifies results with additional attributes.

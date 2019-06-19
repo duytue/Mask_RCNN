@@ -210,13 +210,15 @@ def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, dra
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
         y1, x1, y2, x2 = boxes[i]
-        cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (0, 255,0), thickness=1)
-
-	    # Put class_name on top of bbox
-        # cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
-        # Put score only on top of box
-        score = "%.2f" % pred_scores[i]
-        cv2.putText(drawn_image, score, (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
+        if pred_scores is None:
+            cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (255, 0, 0), thickness=1)
+            # Put class_name on top of bbox
+            # cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (255,0,0), lineType=cv2.LINE_AA)
+        else:
+            cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (0, 255,0), thickness=1)
+            # Put scores on top of bbox
+            score = "%.2f" % pred_scores[i]
+            cv2.putText(drawn_image, score, (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
 
     return drawn_image
 
