@@ -2556,8 +2556,8 @@ class MaskRCNN():
             keras.callbacks.TensorBoard(log_dir=self.log_dir,
                                         histogram_freq=0, write_graph=False, write_images=False),
             keras.callbacks.ModelCheckpoint(self.checkpoint_path,
-                                            verbose=0, save_weights_only=True,
-                                            save_best_only=True),
+                                            verbose=0, save_weights_only=True),
+                                            # save_best_only=True),
             keras.callbacks.LearningRateScheduler(step_decay, verbose=1),
         ]
 
@@ -2680,6 +2680,7 @@ class MaskRCNN():
         # network weights are still random
         exclude_ix = np.where(
             (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) <= 0)[0]
+
         if exclude_ix.shape[0] > 0:
             boxes = np.delete(boxes, exclude_ix, axis=0)
             class_ids = np.delete(class_ids, exclude_ix, axis=0)
@@ -2687,6 +2688,26 @@ class MaskRCNN():
             if not self.config.NO_MASK:
                 masks = np.delete(masks, exclude_ix, axis=0)
             N = class_ids.shape[0]
+
+        # Filter out detections with area > 15% area of the frames.
+        # Testing for resnet50 only
+        if self.config.BACKBONE == "resnet50":
+            thres = 0.05
+
+            h, w = original_image_shape[:2]
+            exclude_ix = np.where(
+                    (boxes[:, 2] - boxes[:, 0]) * (boxes[:, 3] - boxes[:, 1]) > (thres * h * w))[0]
+
+            # DEBUG
+            # print("Removing %d bboxes with large area" % exclude_ix.shape[0])
+
+            if exclude_ix.shape[0] > 0:
+                boxes = np.delete(boxes, exclude_ix, axis=0)
+                class_ids = np.delete(class_ids, exclude_ix, axis=0)
+                scores = np.delete(scores, exclude_ix, axis=0)
+                if not self.config.NO_MASK:
+                    masks = np.delete(masks, exclude_ix, axis=0)
+                N = class_ids.shape[0]
 
         if not self.config.NO_MASK:
             # Resize masks to original image size and set boundary threshold.
