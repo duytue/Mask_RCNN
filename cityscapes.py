@@ -63,6 +63,16 @@ class CocoConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 80  # COCO has 80 classes
 
+class CocoPersonConfig(Config):
+    NAME = "coco_person"
+
+    IMAGES_PER_GPU = 1
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    NUM_CLASSES = 1 + 1  # COCO has 80 classes
+
 class CityPersonConfig(Config):
     """Configuration for training on CityPerson sub-dataset of Cityscapes.
     """
@@ -90,6 +100,26 @@ class CityPersonConfig1(Config):
     NAME = "city_person_res50"
     BACKBONE = "resnet50"
 
+    IMAGES_PER_GPU = 1
+
+    NUM_CLASSES = 1 + 1 # Person
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    IMAGE_MIN_DIM = 1024
+    IMAGE_MAX_DIM = 1024
+
+    MAX_GT_INSTANCES = 50
+
+    RPN_ANCHOR_SCALES = (32, 64, 128, 256)
+
+class CityPersonConfig1_1(Config):
+    # Train from scratch coco
+    NAME = "city_person_res50_1.1"
+    BACKBONE = "resnet50"
+
+    GPU_COUNT = 1
     IMAGES_PER_GPU = 1
 
     NUM_CLASSES = 1 + 1 # Person
@@ -263,6 +293,7 @@ def inference(model, config, image_dir, output_dir, output_type=None):
         file_list = os.listdir(image_dir)
 
         pure_dectetion_times = []
+        # total_area_ratios = []
 
         total_time = time.time()
         for item in tqdm(sorted(file_list)):
@@ -284,9 +315,11 @@ def inference(model, config, image_dir, output_dir, output_type=None):
                                                         draw_box=True, draw_mask=False)
 
                 result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
+                # total_area_ratios.append(area_ratios)
                 cv2.imwrite(os.path.join(output_dir, item), result)
 
         avg_pure = sum(pure_dectetion_times) / len(pure_dectetion_times)
+        # print("AREA RATIO: ", max(total_area_ratios))
         print("Inference on %d images took %.1fs (avg pure detection time: %.3fs)" % (len(file_list), time.time() - total_time, avg_pure))
 
 
@@ -295,6 +328,8 @@ def getConfigVersion(args):
 
     if version == "coco":
         return CocoConfig()
+    elif version == "coco_person":
+        return CocoPersonConfig()
     elif version == "0":
         return CityPersonConfig()
     elif version == "1":
@@ -376,7 +411,7 @@ def main():
 
 
         # Image augmentation
-        augmentation = imgaug.augmenters.SomeOf(3, [
+        augmentation = imgaug.augmenters.Sequential([
                         imgaug.augmenters.Fliplr(0.5),
                         imgaug.augmenters.Affine(
                             # scale=(0.6, 1.4),  # scale images to 60-140% of their size
