@@ -12,7 +12,7 @@ Usage: import the module (see Jupyter notebooks for examples), or run from
        the command line as such:
 
     # Train a new model starting from pre-trained COCO weights
-    python3 coco.py train --dataset=/path/to/coco/ --model=coco
+    python3 coco.py train --dataset=/media/kitemetric/data/datasets/coco --model=coco
 
     # Train a new model starting from ImageNet weights. Also auto download COCO dataset
     python3 coco.py train --dataset=/path/to/coco/ --model=imagenet --download=True
@@ -32,6 +32,9 @@ import sys
 import time
 import numpy as np
 import imgaug  # https://github.com/aleju/imgaug (pip3 install imgaug)
+
+import matplotlib
+matplotlib.use('agg')
 
 # Download and install the Python COCO tools from https://github.com/waleedka/coco
 # That's a fork from the original https://github.com/pdollar/coco with a bug
@@ -86,6 +89,57 @@ class CocoConfig(Config):
     # Number of classes (including background)
     NUM_CLASSES = 1 + 80  # COCO has 80 classes
 
+class CocoPersonConfig(Config):
+    """Configuration for training on MS COCO.
+    Derives from the base Config class and overrides values specific
+    to the COCO dataset.
+    """
+    # Give the configuration a recognizable name
+    NAME = "coco_person"
+
+    IMAGES_PER_GPU = 1
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    # LOSS_WEIGHTS = {
+    #     "rpn_class_loss": 1.2,
+    #     "rpn_bbox_loss": 1.2,
+    #     "mrcnn_class_loss": 1.2,
+    #     "mrcnn_bbox_loss": 1.2,
+    #     "mrcnn_mask_loss": 0.5
+    # }
+
+    # Number of classes (including background)
+    NUM_CLASSES = 1 + 1  # COCO has 80 classes
+
+class CocoPersonConfig1(Config):
+    """Configuration for training on MS COCO.
+    Derives from the base Config class and overrides values specific
+    to the COCO dataset.
+    """
+    # Give the configuration a recognizable name
+    NAME = "coco_person_re50"
+    BACKBONE = "resnet50"
+
+    IMAGES_PER_GPU = 1
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    TRAIN_ROIS_PER_IMAGE = 256
+    ROI_POSITIVE_RATIO = 0.33
+
+    LOSS_WEIGHTS = {
+        "rpn_class_loss": 1.,
+        "rpn_bbox_loss": 1.2,
+        "mrcnn_class_loss": 1.,
+        "mrcnn_bbox_loss": 1.2,
+        "mrcnn_mask_loss": 0.8
+    }
+
+    # Number of classes (including background)
+    NUM_CLASSES = 1 + 1  # COCO has 80 classes
 
 ############################################################
 #  Dataset
@@ -132,6 +186,7 @@ class CocoDataset(utils.Dataset):
         # Add classes
         for i in class_ids:
             self.add_class("coco", i, coco.loadCats(i)[0]["name"])
+            print("Added class [%s] to dataset" % coco.loadCats(i)[0]["name"])
 
         # Add images
         for i in image_ids:
@@ -394,7 +449,15 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
 ############################################################
 #  Training
 ############################################################
+def getConfigVersion(args):
+    version = args.version
 
+    if version == "coco":
+        return CocoConfig()
+    elif version == "coco_person":
+        return CocoPersonConfig()
+    elif version == "coco_person1":
+        return CocoPersonConfig1()
 
 if __name__ == '__main__':
     import argparse
@@ -428,6 +491,14 @@ if __name__ == '__main__':
                         metavar="<True|False>",
                         help='Automatically download and unzip MS-COCO files (default=False)',
                         type=bool)
+    parser.add_argument('--gpu_id', type=str,
+                        default="0",
+                        help="GPU ID to train model.")
+    parser.add_argument("--resume", action='store_true',
+                        help="Resume or training from scratch")
+    parser.add_argument('--version', required=True, type=str,
+                        help="Select config version to run.")
+
     args = parser.parse_args()
     print("Command: ", args.command)
     print("Model: ", args.model)
@@ -435,25 +506,40 @@ if __name__ == '__main__':
     print("Year: ", args.year)
     print("Logs: ", args.logs)
     print("Auto Download: ", args.download)
+    print("GPU_ID:", args.gpu_id)
+    print("Version:", args.version)
 
-    # Configurations
-    if args.command == "train":
-        config = CocoConfig()
-    else:
-        class InferenceConfig(CocoConfig):
-            # Set batch size to 1 since we'll be running inference on
-            # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
-            GPU_COUNT = 1
-            IMAGES_PER_GPU = 1
-            DETECTION_MIN_CONFIDENCE = 0
-        config = InferenceConfig()
-    config.display()
+    os.environ['CUDA_VISIBLE_DEVICES'] = args.gpu_id
+
+    config = getConfigVersion(args)
+    
+    # # Configurations
+    # if args.command == "train":
+    #     config = CocoPersonConfig()
+    # else:
+    #     class InferenceConfig(CocoPersonConfig):
+    #         # Set batch size to 1 since we'll be running inference on
+    #         # one image at a time. Batch size = GPU_COUNT * IMAGES_PER_GPU
+    #         GPU_COUNT = 1
+    #         IMAGES_PER_GPU = 1
+    #         DETECTION_MIN_CONFIDENCE = 0
+    #     config = InferenceConfig()
+    # config.display()
 
     # Create model
     if args.command == "train":
         model = modellib.MaskRCNN(mode="training", config=config,
                                   model_dir=args.logs)
     else:
+        class InferenceConfig(config.__class__):
+            GPU_COUNT = 1
+            IMAGES_PER_GPU = 1
+            DETECTION_MIN_CONFIDENCE = 0.7
+            DETECTION_MAX_INSTANCES = 200
+
+            NO_MASK = True
+
+        config = InferenceConfig()
         model = modellib.MaskRCNN(mode="inference", config=config,
                                   model_dir=args.logs)
 
@@ -470,28 +556,41 @@ if __name__ == '__main__':
         model_path = args.model
 
     # Load weights
-    print("Loading weights ", model_path)
-    model.load_weights(model_path, by_name=True)
+    if not args.resume:
+        print("Loading weights without heads @ ", model_path)
+        model.load_weights(model_path, by_name=True, exclude=[
+                                                    'mrcnn_class_logits', 'mrcnn_bbox_fc',
+                                                    'mrcnn_bbox', 'mrcnn_mask'
+                                                    ])
+    else:
+        print("Loading weights ", model_path)
+        model.load_weights(model_path, by_name=True)
 
     # Train or evaluate
     if args.command == "train":
         # Training dataset. Use the training set and 35K from the
         # validation set, as as in the Mask RCNN paper.
         dataset_train = CocoDataset()
-        dataset_train.load_coco(args.dataset, "train", year=args.year, auto_download=args.download)
+        dataset_train.load_coco(args.dataset, "train", year=args.year, class_ids=[1], auto_download=args.download)
         if args.year in '2014':
-            dataset_train.load_coco(args.dataset, "valminusminival", year=args.year, auto_download=args.download)
+            dataset_train.load_coco(args.dataset, "valminusminival", year=args.year, class_ids=[1], auto_download=args.download)
         dataset_train.prepare()
 
         # Validation dataset
         dataset_val = CocoDataset()
         val_type = "val" if args.year in '2017' else "minival"
-        dataset_val.load_coco(args.dataset, val_type, year=args.year, auto_download=args.download)
+        dataset_val.load_coco(args.dataset, val_type, year=args.year, class_ids=[1], auto_download=args.download)
         dataset_val.prepare()
 
         # Image Augmentation
         # Right/Left flip 50% of the time
-        augmentation = imgaug.augmenters.Fliplr(0.5)
+        # augmentation = imgaug.augmenters.Fliplr(0.5)
+        augmentation = imgaug.augmenters.Sequential([
+                        imgaug.augmenters.Fliplr(0.5),
+                        imgaug.augmenters.Affine(
+                            scale=(0.6, 1.4),  # scale images to 60-140% of their size
+                            order=[0, 1],  # use nearest neighbour or bilinear interpolation (fast)
+                        )])
 
         # *** This training schedule is an example. Update to your needs ***
 
@@ -499,33 +598,33 @@ if __name__ == '__main__':
         print("Training network heads")
         model.train(dataset_train, dataset_val,
                     learning_rate=config.LEARNING_RATE,
-                    epochs=40,
+                    epochs=80,
                     layers='heads',
                     augmentation=augmentation)
 
-        # Training - Stage 2
-        # Finetune layers from ResNet stage 4 and up
-        print("Fine tune Resnet stage 4 and up")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE,
-                    epochs=120,
-                    layers='4+',
-                    augmentation=augmentation)
+        # # Training - Stage 2
+        # # Finetune layers from ResNet stage 4 and up
+        # print("Fine tune Resnet stage 4 and up")
+        # model.train(dataset_train, dataset_val,
+        #             learning_rate=config.LEARNING_RATE,
+        #             epochs=120,
+        #             layers='4+',
+        #             augmentation=augmentation)
 
-        # Training - Stage 3
-        # Fine tune all layers
-        print("Fine tune all layers")
-        model.train(dataset_train, dataset_val,
-                    learning_rate=config.LEARNING_RATE / 10,
-                    epochs=160,
-                    layers='all',
-                    augmentation=augmentation)
+        # # Training - Stage 3
+        # # Fine tune all layers
+        # print("Fine tune all layers")
+        # model.train(dataset_train, dataset_val,
+        #             learning_rate=config.LEARNING_RATE / 10,
+        #             epochs=160,
+        #             layers='all',
+        #             augmentation=augmentation)
 
     elif args.command == "evaluate":
         # Validation dataset
         dataset_val = CocoDataset()
         val_type = "val" if args.year in '2017' else "minival"
-        coco = dataset_val.load_coco(args.dataset, val_type, year=args.year, return_coco=True, auto_download=args.download)
+        coco = dataset_val.load_coco(args.dataset, val_type, year=args.year, class_ids=[1], return_coco=True, auto_download=args.download)
         dataset_val.prepare()
         print("Running COCO evaluation on {} images.".format(args.limit))
         evaluate_coco(model, dataset_val, coco, "bbox", limit=int(args.limit))
