@@ -10,6 +10,7 @@ from pycocotools.cocoeval import COCOeval
 from pycocotools import mask as maskUtils
 
 from mrcnn import utils, visualize
+from mrcnn.model import MaskRCNN
 ############################################################
 #  Dataset
 ############################################################
@@ -234,7 +235,45 @@ def build_coco_results(dataset, image_ids, rois, class_ids, scores, masks):
     return results
 class_names = ["__background__", "Pedestrian"]
 
-def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=None, debug=True):
+def detect_with_model(model, image):
+    if isinstance(model, MaskRCNN):
+        # Detection with MaskRCNN model
+        r = model.detect([image], verbose=0)[0]
+        
+    else:
+        # Id of person in COCO labels.txt
+        # person_id = 1
+        valid_ids = [1]
+
+        # Convert ret dict to Mask R-CNN format
+        r = {}
+        rois = []
+        class_ids = []
+        scores = []
+
+        # print(type(model))
+        # Detection with CenterNet model
+        # ret will be a python dict: {category_id : [[x1, y1, x2, y2, score], ...], }
+        ret = model.run(image)['results']
+
+        for i in valid_ids:
+            for box in ret[i]:
+                x1, y1, x2, y2, score = box
+                rois.append([y1, x1, y2, x2])
+                scores.append(score)
+                class_ids.append(i)
+            
+
+        r['rois'] = np.array(rois, dtype=np.int32)
+        r['class_ids'] = np.array(class_ids, dtype=np.int32)
+        r['scores'] = np.array(scores)
+        r['masks'] = None
+
+    return r
+
+
+
+def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, result_file=None, image_ids=None, debug=True):
     """Runs official COCO evaluation.
     dataset: A Dataset object with valiadtion data
     eval_type: "bbox" or "segm" for bounding box or segmentation evaluation
@@ -261,6 +300,32 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
         limit = len(image_ids)
     print("Evaluating on %d images" % limit)
 
+
+    # =======================================================================
+    # = Evaluating on Coco format result json file
+    # =======================================================================
+    if result_file is not None:
+        print("==> Evaluating with results from file %s" % result_file)
+        # Load result from file
+        coco_results = coco.loadRes(result_file)
+
+        # Evaluate
+        cocoEval = COCOeval(coco, coco_results, eval_type)
+        cocoEval.params.imgIds = coco_image_ids
+        cocoEval.evaluate()
+        cocoEval.accumulate()
+        cocoEval.summarize()
+        return
+
+    # =======================================================================
+    # = Evaluating on Coco format result json file
+    # =======================================================================
+
+
+    # =======================================================================
+    # = Evaluating on images from MOT dataset
+    # =======================================================================
+
     if debug:
         import datetime
         width = 1920
@@ -282,7 +347,8 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
 
         # Run detection
         t = time.time()
-        r = model.detect([image], verbose=0)[0]
+        # r = model.detect([image], verbose=0)[0]
+        r = detect_with_model(model, image)
         t_prediction += (time.time() - t)
 
         # Convert results to COCO format
@@ -294,17 +360,17 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
                                                             draw_box=True, draw_mask=False)
 
             # Ground truth
-            bbox, class_ids = dataset.load_bbox(image_id)
-            result = visualize.draw_instances(result, bbox, None, 
-                                                            class_ids, None, class_names,
-                                                            draw_box=True, draw_mask=False)
+            # bbox, class_ids = dataset.load_bbox(image_id)
+            # result = visualize.draw_instances(result, bbox, None, 
+            #                                                 class_ids, None, class_names,
+            #                                                 draw_box=True, draw_mask=False)
 
             result = cv2.cvtColor(result, cv2.COLOR_RGB2BGR)
 
             vwriter.write(result)
             vis = cv2.resize(result, None, fx=0.5, fy=0.5)
             cv2.imshow('image', vis)
-            if cv2.waitKey(30) == ord('q'):
+            if cv2.waitKey(40) == ord('q'):
                 break
         
 
@@ -331,3 +397,7 @@ def evaluate_coco(model, dataset, coco, eval_type="bbox", limit=0, image_ids=Non
     print("Prediction time: {}. Average {}/image".format(
         t_prediction, t_prediction / len(image_ids)))
     print("Total time: ", time.time() - t_start)
+
+    # =======================================================================
+    # = Evaluating on images from MOT dataset
+    # =======================================================================

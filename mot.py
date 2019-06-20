@@ -15,6 +15,8 @@ matplotlib.use('agg')
 from mot_dataset import MOTDataset, evaluate_coco
 
 ROOT_DIR = os.path.abspath('.')
+CENTERNET_PATH = "/home/kitemetric/workspace/CenterNet/src/lib/"
+sys.path.insert(0, CENTERNET_PATH)
 
 # Import Mask RCNN
 sys.path.append(ROOT_DIR)  # To find local version of the library
@@ -175,6 +177,8 @@ def parse_arguments():
                         help="Select running mode for Mask RCNN.")
     parser.add_argument("--dataset", required=True,
                         help="Path to MOT dataset directory.")
+    parser.add_argument("--result_file", default=None,
+                        help="Path to COCO json result file.")
     parser.add_argument("--model", required=True,
                         default="mask_rcnn_coco.h5",
                         help="Path to weights .h5 file or 'coco'")
@@ -345,26 +349,40 @@ def main():
         model = modellib.MaskRCNN(mode="inference", config=config,
                                 model_dir=args.logs)
     
-    config.display()
 
+    if args.model.lower() == "centernet":
+        # CenterNet: Objects as Points
+        from detectors.detector_factory import detector_factory
+        from opts import opts
+        from pprint import pprint
 
-    # Load weights
-    if args.model.lower() == "coco":
-        model_path = COCO_MODEL_PATH
-    elif args.model.lower() == "last":
-        model_path = model.find_last()
+        MODEL_PATH = "/home/kitemetric/workspace/CenterNet/models/ctdet_coco_dla_2x.pth"
+        TASK = 'ctdet' # or 'multi_pose' for human pose estimation
+        opt = opts().init('{} --load_model {}'.format(TASK, MODEL_PATH).split(' '))
+        opt.flip_test = True
+        opt.nms = True
+        pprint(vars(opt))
+        model = detector_factory[opt.task](opt)
     else:
-        model_path = args.model
+        # MASK R-CNN models
+        # Load weights
+        config.display()
+        if args.model.lower() == "coco":
+            model_path = COCO_MODEL_PATH
+        elif args.model.lower() == "last":
+            model_path = model.find_last()
+        else:
+            model_path = args.model
 
-    if args.mode in ["evaluate", "inference"] or args.resume:
-        model.load_weights(model_path, by_name=True)
-        print("Loaded weights from ", model_path)
-    else:
-        model.load_weights(model_path, by_name=True, exclude=[
-                'mrcnn_class_logits', 'mrcnn_bbox_fc',
-                'mrcnn_bbox', 'mrcnn_mask'
-            ])
-        print("Loaded weights without heads from ", model_path)
+        if args.mode in ["evaluate", "inference"] or args.resume:
+            model.load_weights(model_path, by_name=True)
+            print("Loaded weights from ", model_path)
+        else:
+            model.load_weights(model_path, by_name=True, exclude=[
+                    'mrcnn_class_logits', 'mrcnn_bbox_fc',
+                    'mrcnn_bbox', 'mrcnn_mask'
+                ])
+            print("Loaded weights without heads from ", model_path)
 
     if args.mode == "train":
         # Training set
@@ -419,7 +437,7 @@ def main():
         coco = dataset_val.load_coco(args.dataset, "train", class_ids=[0], return_coco=True)
         dataset_val.prepare()
         # print("Running COCO evaluation on {} images.".format(args.limit))
-        evaluate_coco(model, dataset_val, coco, "bbox", limit=1050)
+        evaluate_coco(model, dataset_val, coco, "bbox", limit=1050, result_file=args.result_file)
     elif args.mode == "inference":
         assert args.image_dir != None
         inference(model, config, args.image_dir, args.result_dir, args.output_type)
