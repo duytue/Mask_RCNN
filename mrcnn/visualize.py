@@ -12,6 +12,7 @@ import sys
 import random
 import itertools
 import colorsys
+import math
 
 import cv2
 import numpy as np
@@ -179,7 +180,50 @@ def class2color(tag):
     else:
         return 0.2, 0.8, 0.2
 
-def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, draw_box=True, draw_mask=True):
+# =======================================================================
+# = Visualizer with Darknet style
+# =======================================================================
+
+def get_color(c, x, max_value, colors=[[1, 0, 1], [0, 0, 1], [0, 1, 1], [0, 1, 0], [1, 1, 0], [1, 0, 0]]):
+  # https://github.com/pjreddie/darknet/blob/master/src/image.c
+  ratio = (x / max_value) * 5
+  i = math.floor(ratio)
+  j = math.ceil(ratio)
+  ratio -= i
+  r = (1. - ratio) * colors[i][c] + ratio * colors[j][c]
+  return r
+
+
+def get_rgb_color(cls, clses):
+  offset = cls * 123457 % clses
+  red = get_color(2, offset, clses)
+  green = get_color(1, offset, clses)
+  blue = get_color(0, offset, clses)
+  return int(red * 255), int(green * 255), int(blue * 255)
+
+def add_coco_bbox(img, class_names, x1, y1, x2, y2, cl, conf=1, show_txt=True): 
+    cat = int(cl)
+    
+    c = get_rgb_color(cl, len(class_names))[::-1]
+    txt = class_names[cl].split()[-1]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    cat_size = cv2.getTextSize(txt, font, 0.5, 2)[0]
+    cv2.rectangle(
+      img, (x1, y1), (x2, y2), c, 2)
+    if show_txt:
+      cv2.rectangle(img,
+                    (x1, y1 - cat_size[1] - 2),
+                    (x1 + cat_size[0], y1 - 2), c, -1)
+      cv2.putText(img, txt, (x1, y1 - 2), 
+                  font, 0.5, (0, 0, 0), thickness=1, lineType=cv2.LINE_AA)
+
+    return img
+
+# =======================================================================
+# = Visualizer with Darknet style
+# =======================================================================
+
+def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, draw_box=True, draw_mask=True, thres=0.3):
     # Number of instances
     N = boxes.shape[0]
     if not N:
@@ -198,6 +242,8 @@ def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, dra
         # Draw person only
         if class_ids[i] != 1:
             continue
+        if pred_scores[i] < thres:
+            continue
         color = class2color(class_names[class_ids[i]])
 
         # Mask
@@ -210,15 +256,19 @@ def draw_instances(image, boxes, masks, class_ids, pred_scores, class_names, dra
             # Skip this instance. Has no bbox. Likely lost in image cropping.
             continue
         y1, x1, y2, x2 = boxes[i]
-        if pred_scores is None:
-            cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (255, 0, 0), thickness=1)
-            # Put class_name on top of bbox
-            # cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (255,0,0), lineType=cv2.LINE_AA)
-        else:
-            cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (0, 255,0), thickness=1)
-            # Put scores on top of bbox
-            score = "%.2f" % pred_scores[i]
-            cv2.putText(drawn_image, score, (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
+
+        # Darknet visualizer
+        drawn_image = add_coco_bbox(drawn_image, class_names, x1, y1, x2, y2, class_ids[i])
+
+        # if pred_scores is None:
+        #     cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (255, 0, 0), thickness=1)
+        #     # Put class_name on top of bbox
+        #     # cv2.putText(drawn_image, class_names[class_ids[i]], (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (255,0,0), lineType=cv2.LINE_AA)
+        # else:
+        #     cv2.rectangle(drawn_image, (x1, y1), (x2, y2), (0, 255,0), thickness=1)
+        #     # Put scores on top of bbox
+        #     score = "%.2f" % pred_scores[i]
+        #     cv2.putText(drawn_image, score, (x1 + 5, y1), cv2.FONT_HERSHEY_PLAIN, 1.0, (0,255,0), lineType=cv2.LINE_AA)
 
     return drawn_image
 
