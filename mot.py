@@ -75,7 +75,35 @@ class CocoPersonConfig(Config):
     IMAGES_PER_GPU = 1
 
     # Number of classes (including background)
-    NUM_CLASSES = 1 + 1  # COCO has 80 classes
+    NUM_CLASSES = 1 + 1  # class person only
+
+class CocoPersonConfig1(Config):
+    """Configuration for training on MS COCO.
+    Derives from the base Config class and overrides values specific
+    to the COCO dataset.
+    """
+    # Give the configuration a recognizable name
+    NAME = "coco_person_re50"
+    BACKBONE = "resnet50"
+
+    IMAGES_PER_GPU = 1
+
+    STEPS_PER_EPOCH = 2000
+    VALIDATION_STEPS = 500
+
+    TRAIN_ROIS_PER_IMAGE = 256
+    ROI_POSITIVE_RATIO = 0.33
+
+    LOSS_WEIGHTS = {
+        "rpn_class_loss": 1.,
+        "rpn_bbox_loss": 1.2,
+        "mrcnn_class_loss": 1.,
+        "mrcnn_bbox_loss": 1.2,
+        "mrcnn_mask_loss": 0.8
+    }
+
+    # Number of classes (including background)
+    NUM_CLASSES = 1 + 1  # class person only
 
 class CityPersonConfig(Config):
     """Configuration for training on MOTChallenge Dataset
@@ -302,6 +330,8 @@ def getConfigVersion(args):
         return CocoConfig()
     elif version == "cocoperson":
         return CocoPersonConfig()
+    elif version == "cocoperson1":
+        return CocoPersonConfig1()
     elif version == "0":
         return CityPersonConfig()
     elif version == "1":
